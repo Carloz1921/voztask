@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="VozTask">
+<meta name="theme-color" content="#E8A020">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<title>VozTask</title>
+<style>
+/* ── RESET & BASE ── */
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow-x:hidden}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#080c12;color:#e2e8f4;
+     padding-bottom:env(safe-area-inset-bottom);-webkit-font-smoothing:antialiased}
+input,button,select,textarea{font-family:inherit;font-size:16px}
+/* prevent iOS zoom on inputs */
+input[type=text],input[type=date],select,textarea{font-size:16px}
+button{cursor:pointer;-webkit-appearance:none}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:#1e2a38;border-radius:2px}
+
+/* ── ANIMATIONS ── */
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(232,160,32,.5)}60%{box-shadow:0 0 0 16px rgba(232,160,32,0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadein{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@keyframes shimmer{0%{opacity:.7}50%{opacity:1}100%{opacity:.7}}
+
+.pulse{animation:pulse 1.4s ease infinite}
+.spin{animation:spin .8s linear infinite}
+.fadein{animation:fadein .2s ease}
+.shimmer{animation:shimmer 1.5s ease infinite}
+
+/* ── LAYOUT ── */
+#app{display:flex;flex-direction:column;min-height:100vh}
+.header{background:#0d1520;border-bottom:1px solid #1a2535;padding:12px 16px;
+        display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;
+        position:sticky;top:0;z-index:10}
+.input-zone{background:#0a0f18;border-bottom:1px solid #1a2535;padding:16px}
+.filter-bar{background:#0a0f18;border-bottom:1px solid #1a2535;padding:8px 16px;
+            display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;align-items:center}
+.columns{display:grid;grid-template-columns:1fr 1fr;flex:1}
+.columns.single{grid-template-columns:1fr}
+@media(max-width:480px){
+  .columns{grid-template-columns:1fr!important}
+  .stats span{font-size:18px!important}
+  .col-tasks{padding:10px!important}
+}
+
+/* ── SHARED UI ── */
+.mono{font-family:'Courier New','Courier',monospace}
+.chip{font-family:'Courier New',monospace;font-size:7px;letter-spacing:.1em;
+      border-radius:2px;padding:1px 5px;border:1px solid;display:inline-flex;align-items:center}
+.badge{font-family:'Courier New',monospace;font-size:9px;letter-spacing:.08em;
+       border-radius:3px;padding:2px 8px}
+
+/* ── INPUTS ── */
+.vt-input{background:#0d1520;border:1px solid #1a2535;border-radius:6px;
+          padding:10px 14px;color:#e2e8f4;width:100%;color-scheme:dark;
+          -webkit-appearance:none;appearance:none}
+.vt-input:focus{outline:none;border-color:#E8A02066}
+.vt-select{background:#0d1520;border:1px solid #1a2535;border-radius:6px;
+           padding:8px 10px;color:#e2e8f4;cursor:pointer;color-scheme:dark;-webkit-appearance:none}
+input[type=date].vt-input::-webkit-calendar-picker-indicator{
+  filter:invert(.7) sepia(1) saturate(2) hue-rotate(5deg);cursor:pointer;opacity:.8}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;
+     border-radius:4px;font-family:'Courier New',monospace;font-size:9px;
+     letter-spacing:.08em;padding:4px 10px;border:1px solid;cursor:pointer;
+     background:transparent;transition:all .15s;user-select:none;-webkit-user-select:none}
+.btn:active{transform:scale(.96)}
+.btn-amber{border-color:#E8A020;color:#E8A020}
+.btn-amber.active{background:#E8A020;color:#080c12;font-weight:700}
+.btn-red{border-color:#EF4444;color:#EF4444}
+.btn-dim{border-color:#253040;color:#4a5568}
+.btn-dim.active{background:#253040;color:#e2e8f4}
+
+/* ── MIC BUTTON ── */
+.mic-btn{width:72px;height:72px;border-radius:50%;border:2px solid;
+         display:flex;align-items:center;justify-content:center;
+         font-size:28px;cursor:pointer;user-select:none;-webkit-user-select:none;
+         transition:all .15s;background:transparent;
+         -webkit-touch-callout:none;touch-action:none}
+.mic-btn:active{transform:scale(.95)}
+
+/* ── CARDS ── */
+.task-card{background:#0b101a;border:1px solid #1a2535;border-left:3px solid;
+           border-radius:4px;padding:10px;transition:background .12s;position:relative}
+.task-card.editing{background:#101828;border-color:#E8A02066}
+.task-card.selected{background:#12192a;outline:2px solid #E8A020}
+.task-card.done-card{opacity:.45}
+
+/* ── STATUS TOAST ── */
+.toast{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom));left:50%;
+       transform:translateX(-50%);background:#0d1520;border:1px solid;border-radius:8px;
+       padding:10px 20px;font-family:'Courier New',monospace;font-size:10px;letter-spacing:.08em;
+       z-index:100;max-width:90%;text-align:center;animation:fadein .2s ease;
+       white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── MIC GUIDE ── */
+.mic-guide{background:#120d00;border:1px solid #E8A02044;border-radius:8px;
+           padding:14px 16px;margin:8px auto 0;max-width:440px;width:100%}
+.mic-guide-step{display:flex;gap:8px;margin-bottom:6px;font-size:12px;color:#c8a060;line-height:1.4}
+.mic-guide-num{font-family:'Courier New',monospace;font-size:10px;color:#E8A020;
+               font-weight:700;min-width:16px;padding-top:1px}
+
+/* ── OFFLINE BANNER ── */
+.offline-banner{background:#1a0000;border-bottom:1px solid #EF444444;
+                padding:6px 16px;text-align:center;font-family:'Courier New',monospace;
+                font-size:9px;letter-spacing:.1em;color:#EF4444}
+
+/* ── INSTALL BANNER ── */
+.install-banner{background:#0d1520;border:1px solid #E8A02033;
+                padding:10px 16px;display:flex;align-items:center;
+                justify-content:space-between;gap:12px}
+
+/* ── CONFIRM STRIP ── */
+.confirm-strip{background:#1a0a0a;border-bottom:1px solid #EF444444;
+               padding:10px 16px;display:flex;align-items:center;
+               justify-content:space-between;flex-wrap:wrap;gap:8px}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     CONFIGURACIÓN — Edita aquí tus API keys antes de publicar
+ ═══════════════════════════════════════════════════════════ -->
+<script>
+const CONFIG = {
+  HF_TOKEN:   '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',       // → huggingface.co/settings/tokens (gratis)
+  GEMINI_KEY: 'AIzaSyB--ai35y9zaq9sIWepca0teCAh9XBEBhE',        // → aistudio.google.com/app/apikey (gratis)
+  SHEETS_URL: 'https://script.google.com/macros/s/AKfycbwBlNN1USiM_iE0TyISjIg7sC9ucD0QE8cIMWDIQJYe8JJqJbIN8MQWJshJEh2GruTpwA/exec', // Apps Script URL
+  // Whisper model (cambiar por "openai/whisper-base" si quieres más velocidad)
+  WHISPER_MODEL: 'openai/whisper-large-v3-turbo',
+};
+</script>
+<!-- ═══════════════════════════════════════════════════════════ -->
+
+<div id="app"></div>
+<div id="toast-container"></div>
+
+<script>
+/* ════════════════════════════════════════
+   CONSTANTS
+════════════════════════════════════════ */
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const DIAS  = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const REC_LABELS = {diaria:'↻ Diaria', semanal:'↻ Semanal', mensual:'↻ Mensual'};
+const PRI   = {alta:{l:'ALTA',c:'#EF4444'}, media:{l:'MEDIA',c:'#E8A020'}, baja:{l:'BAJA',c:'#4a5568'}};
+const COLORS = {
+  bg:'#080c12', surf:'#0d1520', bord:'#1a2535', dim:'#253040',
+  amber:'#E8A020', blue:'#3B82F6', green:'#22C55E', red:'#EF4444', purple:'#A78BFA',
+  text:'#e2e8f4', muted:'#4a5568', faint:'#2a3545'
+};
+
+/* ════════════════════════════════════════
+   STATE
+════════════════════════════════════════ */
+let S = {
+  tasks: [],
+  loading: true,
+  syncing: false,
+  online: navigator.onLine,
+  voiceState: 'idle',      // idle | requesting | recording | transcribing | parsing | saving
+  transcript: '',
+  manualText: '',
+  manualDeadline: '',
+  manualRec: '',
+  mode: 'ia',
+  inputType: 'voice',
+  micPerm: 'unknown',      // unknown | granted | denied | unavailable
+  filter: 'pending',
+  view: 'both',
+  editingId: null,
+  editDraft: {},
+  selectMode: false,
+  selectedIds: [],
+  confirmAction: null,
+  offlineQueue: JSON.parse(localStorage.getItem('vt-queue') || '[]'),
+  installPrompt: null,
+  showMicGuide: false,
+};
+
+let mediaRecorder = null;
+let audioChunks   = [];
+let recogStart    = 0;
+
+/* ════════════════════════════════════════
+   UTILITIES
+════════════════════════════════════════ */
+function todayStr() {
+  const n = new Date();
+  return `${pad(n.getDate())}/${pad(n.getMonth()+1)}/${n.getFullYear()}`;
+}
+function todayCtx() {
+  const n = new Date();
+  return { str: `${pad(n.getDate())}/${pad(n.getMonth()+1)}/${n.getFullYear()}`,
+           day: DIAS[n.getDay()] };
+}
+function pad(n){ return String(n).padStart(2,'0'); }
+function fmtDate(iso){ const d=new Date(iso); return `${pad(d.getDate())} ${MESES[d.getMonth()]} ${d.getFullYear()}`; }
+function fmtTime(iso){ const d=new Date(iso); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+function toHtmlDate(s){ if(!s||!s.match(/^\d{2}\/\d{2}\/\d{4}$/))return''; const[d,m,y]=s.split('/');return`${y}-${m}-${d}`; }
+function fromHtmlDate(s){ if(!s)return null; const[y,m,d]=s.split('-');return`${d}/${m}/${y}`; }
+function uid(){ return Date.now()+'_'+Math.random().toString(36).slice(2,7); }
+function nextDeadline(rec){
+  const n=new Date();
+  if(rec==='diaria') n.setDate(n.getDate()+1);
+  else if(rec==='semanal') n.setDate(n.getDate()+7);
+  else if(rec==='mensual') n.setMonth(n.getMonth()+1);
+  return `${pad(n.getDate())}/${pad(n.getMonth()+1)}/${n.getFullYear()}`;
+}
+
+/* ════════════════════════════════════════
+   TOAST
+════════════════════════════════════════ */
+let toastTimer = null;
+function toast(text, color=COLORS.amber, duration=3500) {
+  const c = document.getElementById('toast-container');
+  if (!c) return;
+  c.innerHTML = '';
+  if (!text) return;
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.style.borderColor = color + '66';
+  t.style.color = color;
+  t.textContent = text;
+  c.appendChild(t);
+  clearTimeout(toastTimer);
+  if (duration) toastTimer = setTimeout(() => { c.innerHTML = ''; }, duration);
+}
+
+/* ════════════════════════════════════════
+   GOOGLE SHEETS API (via Apps Script)
+════════════════════════════════════════ */
+async function sheetsGet() {
+  const resp = await fetch(CONFIG.SHEETS_URL + '?v=' + Date.now());
+  if (!resp.ok) throw new Error('Sheets GET error ' + resp.status);
+  return resp.json();
+}
+
+async function sheetsPost(body) {
+  const resp = await fetch(CONFIG.SHEETS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) throw new Error('Sheets POST error ' + resp.status);
+  return resp.json();
+}
+
+async function loadTasks() {
+  S.loading = true; render();
+  try {
+    const data = await sheetsGet();
+    S.tasks = data.tasks || [];
+    S.loading = false;
+    // Process offline queue if online
+    if (S.online && S.offlineQueue.length > 0) await processQueue();
+  } catch (e) {
+    console.error('loadTasks:', e);
+    // Fall back to local cache
+    const cached = localStorage.getItem('vt-tasks-cache');
+    if (cached) S.tasks = JSON.parse(cached);
+    S.loading = false;
+    toast('Sin conexión — mostrando caché local', COLORS.amber, 4000);
+  }
+  localStorage.setItem('vt-tasks-cache', JSON.stringify(S.tasks));
+  render();
+}
+
+async function syncAdd(task) {
+  try {
+    await sheetsPost({ action: 'add', task });
+  } catch(e) {
+    enqueue({ action: 'add', task });
+  }
+}
+
+async function syncUpdate(id, task) {
+  try {
+    await sheetsPost({ action: 'update', id, task });
+  } catch(e) {
+    enqueue({ action: 'update', id, task });
+  }
+}
+
+async function syncDelete(id) {
+  try {
+    await sheetsPost({ action: 'delete', id });
+  } catch(e) {
+    enqueue({ action: 'delete', id });
+  }
+}
+
+async function syncBulkDelete(ids) {
+  try {
+    await sheetsPost({ action: 'bulkDelete', ids });
+  } catch(e) {
+    enqueue({ action: 'bulkDelete', ids });
+  }
+}
+
+/* ════════════════════════════════════════
+   OFFLINE QUEUE
+════════════════════════════════════════ */
+function enqueue(op) {
+  S.offlineQueue.push(op);
+  localStorage.setItem('vt-queue', JSON.stringify(S.offlineQueue));
+}
+
+async function processQueue() {
+  if (!S.offlineQueue.length) return;
+  const q = [...S.offlineQueue];
+  S.offlineQueue = [];
+  localStorage.setItem('vt-queue', '[]');
+  for (const op of q) {
+    try {
+      await sheetsPost(op);
+    } catch(e) {
+      enqueue(op); // re-queue if still fails
+    }
+  }
+  if (!S.offlineQueue.length) toast('✓ Sincronizado con Google Sheets', COLORS.green, 2500);
+}
+
+/* ════════════════════════════════════════
+   VOICE — MediaRecorder + HuggingFace Whisper
+   Funciona en iPhone Safari (iOS 14.5+) y Chrome
+════════════════════════════════════════ */
+async function startVoice() {
+  if (S.voiceState !== 'idle') return;
+  S.voiceState = 'requesting'; render();
+
+  // 1. Solicitar permiso de micrófono
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    S.micPerm = 'granted';
+    S.showMicGuide = false;
+  } catch (err) {
+    S.voiceState = 'idle';
+    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      S.micPerm = 'denied';
+      S.showMicGuide = true;
+      toast('🔒 Permiso de micrófono denegado — sigue la guía abajo', COLORS.red, 0);
+    } else if (err.name === 'NotFoundError') {
+      S.micPerm = 'unavailable';
+      toast('🎤 No se encontró micrófono en este dispositivo', COLORS.red, 5000);
+    } else {
+      toast('Error de micrófono: ' + err.message, COLORS.red, 5000);
+    }
+    render(); return;
+  }
+
+  // 2. Iniciar grabación
+  const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
+    : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
+    : 'audio/mp4'; // iOS Safari
+
+  audioChunks = [];
+  mediaRecorder = new MediaRecorder(stream, { mimeType });
+  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+  mediaRecorder.onstop = async () => {
+    stream.getTracks().forEach(t => t.stop());
+    const blob = new Blob(audioChunks, { type: mimeType });
+    await transcribeAndProcess(blob);
+  };
+
+  recogStart = Date.now();
+  mediaRecorder.start(250); // collect every 250ms
+  S.voiceState = 'recording'; S.transcript = '';
+  toast('🎤 Grabando… toca de nuevo para detener', COLORS.amber, 0);
+  render();
+}
+
+function stopVoice() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    const elapsed = Date.now() - recogStart;
+    if (elapsed < 500) {
+      toast('Habla por al menos 1 segundo', COLORS.muted, 3000);
+      mediaRecorder.stop(); S.voiceState = 'idle'; render(); return;
+    }
+    S.voiceState = 'transcribing';
+    toast('⟳ Transcribiendo con Whisper…', COLORS.blue, 0);
+    render();
+    mediaRecorder.stop();
+  }
+}
+
+async function transcribeAndProcess(blob) {
+  // 3. Transcribir con HuggingFace Whisper
+  let text = '';
+  try {
+    const hfResp = await fetch(
+      `https://api-inference.huggingface.co/models/${CONFIG.WHISPER_MODEL}`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${CONFIG.HF_TOKEN}`,
+          'Content-Type': blob.type,
+        },
+        body: blob,
+      }
+    );
+
+    if (hfResp.status === 503) {
+      // Model loading — retry once after 12s
+      toast('⟳ Cargando modelo Whisper (12s)…', COLORS.amber, 0);
+      await new Promise(r => setTimeout(r, 12000));
+      return transcribeAndProcess(blob);
+    }
+
+    if (!hfResp.ok) {
+      const err = await hfResp.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${hfResp.status}`);
+    }
+
+    const result = await hfResp.json();
+    text = result.text || result[0]?.text || '';
+    text = text.trim();
+
+    if (!text) {
+      S.voiceState = 'idle'; render();
+      toast('No se detectó voz. Habla más cerca del micrófono.', COLORS.muted, 4000);
+      return;
+    }
+
+    S.transcript = text; render();
+  } catch(e) {
+    S.voiceState = 'idle'; render();
+    toast('Error Whisper: ' + e.message, COLORS.red, 6000);
+    return;
+  }
+
+  // 4. Parsear con Gemini
+  S.voiceState = 'parsing';
+  toast('✦ IA organizando…', COLORS.purple, 0);
+  render();
+  await processText(text);
+}
+
+/* ════════════════════════════════════════
+   AI — Gemini 1.5 Flash (gratis)
+════════════════════════════════════════ */
+async function processText(text, forcedDeadline=null, forcedRec=null) {
+  const { str: today, day } = todayCtx();
+  let parsed = null;
+
+  if (S.mode === 'ia') {
+    try {
+      const prompt = `Hoy es ${today} (${day}). Eres el asistente de Carlos Rojas, Jefe de Laboratorio de Refinería La Pampilla, Lima, Perú.
+Analiza el texto y extrae info. Responde SOLO JSON sin markdown.
+{"title":"título conciso máx 75 chars","detail":"detalle o null","category":"trabajo"|"personal","type":"tarea"|"nota","priority":"alta"|"media"|"baja","deadline":"DD/MM/YYYY"|null,"recurrence":"diaria"|"semanal"|"mensual"|null}
+FECHA LÍMITE (CRÍTICO): Si el texto menciona CUALQUIER referencia temporal futura (mañana, viernes, 5 de mayo, próxima semana, en 3 días…) conviértela a DD/MM/YYYY usando ${today} como hoy. NUNCA null si hay fecha.
+RECURRENCIA: solo si menciona periodicidad explícita (todos los días, cada semana, mensualmente, etc.).
+Trabajo=laboratorio,calibración,LIMS,ISO,SUNAT,OSINERGMIN,refinería,muestras,equipos,reportes.
+Personal=familia,médico,compras,hogar,universidad,postgrado,ocio.
+Texto: "${text}"`;
+
+      const gResp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${CONFIG.GEMINI_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 400 }
+          })
+        }
+      );
+
+      if (!gResp.ok) throw new Error('Gemini HTTP ' + gResp.status);
+      const gData = await gResp.json();
+      const raw = gData.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+      const m = raw.match(/\{[\s\S]*\}/);
+      parsed = JSON.parse(m ? m[0] : '{}');
+    } catch(e) {
+      console.warn('Gemini error:', e);
+      parsed = null; // fall through to basic save
+    }
+  }
+
+  // Build task
+  const now = new Date().toISOString();
+  const task = {
+    id:         uid(),
+    title:      parsed?.title || text.slice(0,75),
+    detail:     (parsed?.detail && parsed.detail !== 'null') ? parsed.detail : null,
+    category:   parsed?.category || 'trabajo',
+    type:       parsed?.type || 'tarea',
+    priority:   parsed?.priority || 'media',
+    deadline:   forcedDeadline || (parsed?.deadline && parsed.deadline !== 'null' ? parsed.deadline : null),
+    recurrence: forcedRec || (parsed?.recurrence && parsed.recurrence !== 'null' ? parsed.recurrence : null),
+    done:       false,
+    createdAt:  now,
+    updatedAt:  now,
+  };
+
+  // Save locally first
+  S.tasks = [task, ...S.tasks];
+  localStorage.setItem('vt-tasks-cache', JSON.stringify(S.tasks));
+  S.voiceState = 'saving'; render();
+
+  // Sync to Sheets
+  S.voiceState = 'idle'; S.transcript = ''; S.manualText = ''; S.manualDeadline = ''; S.manualRec = '';
+  await syncAdd(task);
+
+  const parts = [`✓ ${task.category} · ${task.priority}`];
+  if (task.deadline) parts.push(`📅 ${task.deadline}`);
+  if (task.recurrence) parts.push(REC_LABELS[task.recurrence]);
+  toast(parts.join(' · '), COLORS.green);
+  render();
+}
+
+async function submitManual() {
+  const text = S.manualText.trim();
+  if (!text || S.voiceState !== 'idle') return;
+  const fd = S.manualDeadline ? fromHtmlDate(S.manualDeadline) : null;
+  const fr = S.manualRec || null;
+  S.voiceState = 'parsing';
+  toast('✦ IA organizando…', COLORS.purple, 0);
+  render();
+  await processText(text, fd, fr);
+}
+
+/* ════════════════════════════════════════
+   TASK OPERATIONS
+════════════════════════════════════════ */
+async function toggleDone(id) {
+  const task = S.tasks.find(t => t.id === id);
+  if (!task) return;
+  task.done = !task.done;
+  task.updatedAt = new Date().toISOString();
+  localStorage.setItem('vt-tasks-cache', JSON.stringify(S.tasks));
+  render();
+  await syncUpdate(id, { done: task.done, updatedAt: task.updatedAt });
+}
+
+async function deleteOne(id) {
+  if (S.editingId === id) { S.editingId = null; S.editDraft = {}; }
+  S.selectedIds = S.selectedIds.filter(x => x !== id);
+  S.tasks = S.tasks.filter(t => t.id !== id);
+  localStorage.setItem('vt-tasks-cache', JSON.stringify(S.tasks));
+  render();
+  await syncDelete(id);
+}
+
+async function renewTask(task) {
+  const deadline = nextDeadline(task.recurrence);
+  const now = new Date().toISOString();
+  const nt = { ...task, id: uid(), done: false, createdAt: now, updatedAt: now, deadline };
+  S.tasks = [nt, ...S.tasks];
+  localStorage.setItem('vt-tasks-cache', JSON.stringify(S.tasks));
+  render();
+  await syncAdd(nt);
+  toast(`↻ Nueva instancia · límite ${deadline}`, COLORS.purple);
+}
+
+function startEdit(task) {
+  S.editingId = task.id;
+  S.editDraft = {
+    title: task.title, detail: task.detail || '', category: task.category,
+    type: task.type, priority: task.priority,
+    deadline: task.deadline || null, recurrence: task.recurrence || ''
+  };
+  render();
+}
+function cancelEdit() { S.editingId = null; S.editDraft = {}; render(); }
+
+async function saveEdit(id) {
+  const d = S.editDraft;
+  const task = S.tasks.find(t => t.id === id);
+  if (!task) return;
+  Object.assign(task, {
+    title: d.title.trim() || task.title,
+    detail: d.detail.trim() || null,
+    category: d.category, type: d.type, priority: d.priority,
+    deadline: d.deadline || null,
+    recurrence: d.recurrence || null,
+    updatedAt: new Date().toISOString()
+  });
+  S.editingId = null; S.editDraft = {};
+  localStorage.setItem('vt-tasks-cache', JSON.stringify(S.tasks));
+  render();
+  await syncUpdate(id, task);
+  toast('✓ Tarea actualizada', COLORS.green);
+}
+
+function toggleSelect(id) {
+  if (S.selectedIds.includes(id)) S.selectedIds = S.selectedIds.filter(x => x !== id);
+  else S.selectedIds = [...S.selectedIds, id];
+  render();
+}
+function startSelectMode() { S.selectMode = true; S.selectedIds = []; S.confirmAction = null; render(); }
+function endSelectMode() { S.selectMode = false; S.selectedIds = []; S.confirmAction = null; render(); }
+
+async function confirmDelete() {
+  const ids = S.confirmAction === 'completadas'
+    ? S.tasks.filter(t => t.done).map(t => t.id)
+    : [...S.selectedIds];
+  const n = ids.length;
+  S.tasks = S.tasks.filter(t => !ids.includes(t.id));
+  localStorage.setItem('vt-tasks-cache', JSON.stringify(S.tasks));
+  endSelectMode();
+  render();
+  await syncBulkDelete(ids);
+  toast(`🗑 ${n} tareas eliminadas`, COLORS.red, 3000);
+}
+
+/* ════════════════════════════════════════
+   DOM HELPERS
+════════════════════════════════════════ */
+function el(tag, props={}, ...children) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === 'style' && typeof v === 'object') Object.assign(e.style, v);
+    else if (k === 'cls') e.className = v;
+    else if (k.startsWith('on') && typeof v === 'function') e.addEventListener(k.slice(2).toLowerCase(), v, {passive: false});
+    else e.setAttribute(k, v);
+  }
+  for (const c of children.flat(Infinity)) {
+    if (c == null || c === false) continue;
+    e.appendChild(typeof c === 'string' || typeof c === 'number' ? document.createTextNode(c) : c);
+  }
+  return e;
+}
+function chip(text, color, bg) {
+  return el('span', {cls:'chip', style:{color,borderColor:color+'44',background:bg||color+'14'}}, text);
+}
+
+/* ════════════════════════════════════════
+   BUILD CARD
+════════════════════════════════════════ */
+function buildCard(task, accent) {
+  const pb = PRI[task.priority] || PRI.media;
+  const isEditing = S.editingId === task.id;
+  const isSelected = S.selectedIds.includes(task.id);
+
+  const clsList = ['task-card', 'fadein',
+    isEditing ? 'editing' : '',
+    isSelected ? 'selected' : '',
+    (task.done && !isEditing && !S.selectMode) ? 'done-card' : ''
+  ].filter(Boolean).join(' ');
+
+  const card = el('div', {cls:clsList,
+    style:{borderLeftColor: task.done && !isEditing ? COLORS.bord : accent}
+  });
+
+  /* ── SELECT MODE ── */
+  if (S.selectMode && !isEditing) {
+    card.style.cursor = 'pointer';
+    card.addEventListener('click', () => toggleSelect(task.id));
+    const row = el('div', {style:{display:'flex',gap:'10px',alignItems:'flex-start'}});
+    const chk = el('div', {style:{
+      width:'20px',height:'20px',minWidth:'20px',
+      border:`2px solid ${isSelected ? COLORS.amber : COLORS.faint}`,
+      borderRadius:'4px',background:isSelected?COLORS.amber:'transparent',
+      display:'flex',alignItems:'center',justifyContent:'center',
+      fontSize:'12px',color:COLORS.bg,flexShrink:'0',transition:'all .12s',marginTop:'2px'
+    }}, isSelected ? '✓' : '');
+    const info = el('div', {style:{flex:'1',minWidth:'0'}});
+    info.appendChild(el('div', {style:{fontSize:'13px',color:COLORS.text,lineHeight:'1.4',wordBreak:'break-word'}}, task.title));
+    info.appendChild(el('span', {cls:'mono', style:{fontSize:'9px',color:task.category==='trabajo'?COLORS.blue:COLORS.green,letterSpacing:'.08em'}},
+      task.category==='trabajo' ? '🏭 TRABAJO' : '🏠 PERSONAL'));
+    row.appendChild(chk); row.appendChild(info); card.appendChild(row);
+    return card;
+  }
+
+  /* ── EDIT MODE ── */
+  if (isEditing) {
+    const d = S.editDraft;
+    card.appendChild(el('div', {cls:'mono', style:{fontSize:'8px',color:COLORS.amber,letterSpacing:'.18em',marginBottom:'10px'}}, '✎ EDITANDO TAREA'));
+
+    const titleIn = el('input', {type:'text', value:d.title, cls:'vt-input', placeholder:'Título…',
+      style:{marginBottom:'8px'}, oninput: e=>{ S.editDraft.title = e.target.value; }});
+    card.appendChild(titleIn);
+
+    const detailIn = el('textarea', {cls:'vt-input', placeholder:'Detalle adicional…',
+      style:{marginBottom:'8px',resize:'vertical',minHeight:'50px'},
+      oninput: e=>{ S.editDraft.detail = e.target.value; }}, d.detail);
+    card.appendChild(detailIn);
+
+    const r1 = el('div', {style:{display:'flex',gap:'6px',marginBottom:'8px',flexWrap:'wrap'}});
+    const mkSel = (opts, val, cb) => {
+      const s = el('select', {cls:'vt-select', onchange:e=>cb(e.target.value)});
+      opts.forEach(([v,l]) => { const o = el('option', {value:v}, l); if(v===val) o.selected=true; s.appendChild(o); });
+      return s;
+    };
+    r1.appendChild(mkSel([['trabajo','🏭 Trabajo'],['personal','🏠 Personal']], d.category, v=>{ S.editDraft.category=v; }));
+    r1.appendChild(mkSel([['tarea','Tarea'],['nota','Nota']], d.type, v=>{ S.editDraft.type=v; }));
+    r1.appendChild(mkSel([['alta','▲ Alta'],['media','● Media'],['baja','▽ Baja']], d.priority, v=>{ S.editDraft.priority=v; }));
+    r1.appendChild(mkSel([['','Sin recurrencia'],['diaria','↻ Diaria'],['semanal','↻ Semanal'],['mensual','↻ Mensual']], d.recurrence||'', v=>{ S.editDraft.recurrence=v||null; }));
+    card.appendChild(r1);
+
+    // Deadline with date picker
+    const dlRow = el('div', {style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'10px'}});
+    dlRow.appendChild(el('span', {cls:'mono', style:{fontSize:'8px',color:'#60A5FA',letterSpacing:'.1em',whiteSpace:'nowrap',flexShrink:'0'}}, '📅 LÍMITE'));
+    const dlIn = el('input', {type:'date', cls:'vt-input', value:toHtmlDate(d.deadline),
+      style:{flex:'1',cursor:'pointer'},
+      onchange: e=>{ S.editDraft.deadline = e.target.value ? fromHtmlDate(e.target.value) : null; }});
+    const dlClr = el('button', {cls:'btn btn-dim', style:{whiteSpace:'nowrap'},
+      onclick: ()=>{ S.editDraft.deadline=null; dlIn.value=''; render(); }}, '✕ quitar');
+    dlRow.appendChild(dlIn); dlRow.appendChild(dlClr);
+    card.appendChild(dlRow);
+
+    const btns = el('div', {style:{display:'flex',gap:'8px',justifyContent:'flex-end'}});
+    btns.appendChild(el('button', {cls:'btn btn-dim', onclick:cancelEdit}, 'CANCELAR'));
+    btns.appendChild(el('button', {cls:'btn btn-amber active', onclick:()=>saveEdit(task.id)}, 'GUARDAR'));
+    card.appendChild(btns);
+    return card;
+  }
+
+  /* ── VIEW MODE ── */
+  const row = el('div', {style:{display:'flex',gap:'8px',alignItems:'flex-start'}});
+
+  // Checkbox
+  const cb = el('button', {
+    style:{width:'20px',height:'20px',minWidth:'20px',flexShrink:'0',
+           border:`1px solid ${task.done?'#22C55E':COLORS.faint}`,borderRadius:'3px',
+           background:task.done?'#22C55E22':'transparent',display:'flex',alignItems:'center',
+           justifyContent:'center',fontSize:'12px',color:'#22C55E',marginTop:'2px'},
+    onclick:()=>toggleDone(task.id)
+  }, task.done ? '✓' : '');
+
+  // Content
+  const content = el('div', {style:{flex:'1',minWidth:'0'}});
+  content.appendChild(el('div', {
+    style:{fontSize:'13px',color:task.done?COLORS.muted:COLORS.text,
+           textDecoration:task.done?'line-through':'none',lineHeight:'1.4',wordBreak:'break-word'}
+  }, task.title));
+  if (task.detail) {
+    content.appendChild(el('div', {style:{fontSize:'11px',color:COLORS.muted,marginTop:'3px',lineHeight:'1.35'}}, task.detail));
+  }
+
+  // Meta chips
+  const meta = el('div', {style:{display:'flex',gap:'5px',marginTop:'7px',flexWrap:'wrap',alignItems:'center'}});
+  meta.appendChild(chip(task.type==='tarea'?'TAREA':'NOTA', COLORS.muted));
+  meta.appendChild(chip(pb.l, pb.c));
+  if (task.recurrence) meta.appendChild(chip(REC_LABELS[task.recurrence], COLORS.purple));
+  if (task.deadline) meta.appendChild(chip('📅 '+task.deadline, '#60A5FA'));
+  meta.appendChild(el('span', {cls:'mono', style:{fontSize:'7px',color:COLORS.faint}}, '·'));
+  const ts = el('span', {cls:'mono', style:{fontSize:'7px',color:COLORS.muted}});
+  ts.appendChild(el('span', {style:{opacity:'.4'}}, '🕐 '));
+  ts.appendChild(document.createTextNode(fmtDate(task.createdAt)+' '+fmtTime(task.createdAt)));
+  meta.appendChild(ts);
+  content.appendChild(meta);
+
+  // Renew button for completed recurring
+  if (task.done && task.recurrence) {
+    const rb = el('button', {
+      cls:'btn', style:{marginTop:'8px',borderColor:COLORS.purple,color:COLORS.purple,background:COLORS.purple+'14'},
+      onclick:()=>renewTask(task)
+    }, `↻ Nueva instancia ${(REC_LABELS[task.recurrence]||'').replace('↻ ','').toLowerCase()}`);
+    content.appendChild(rb);
+  }
+
+  // Action buttons (hover/touch)
+  const actions = el('div', {style:{display:'flex',gap:'4px',flexShrink:'0',opacity:'0',transition:'opacity .12s'}});
+  actions.appendChild(el('button', {cls:'btn btn-amber', style:{padding:'3px 7px'},
+    onclick:()=>startEdit(task)}, '✎'));
+  actions.appendChild(el('button', {cls:'btn btn-red', style:{padding:'3px 7px',opacity:'.7'},
+    onclick:()=>deleteOne(task.id)}, '✕'));
+
+  row.appendChild(cb); row.appendChild(content); row.appendChild(actions);
+  card.appendChild(row);
+
+  card.addEventListener('mouseenter', () => { card.style.background=COLORS.surf; actions.style.opacity='1'; });
+  card.addEventListener('mouseleave', () => { card.style.background='#0b101a'; actions.style.opacity='0'; });
+  // Touch: show actions briefly on touch
+  card.addEventListener('touchstart', () => { actions.style.opacity='1'; }, {passive:true});
+  card.addEventListener('touchend', () => { setTimeout(()=>{ actions.style.opacity='0'; }, 2000); }, {passive:true});
+
+  return card;
+}
+
+/* ════════════════════════════════════════
+   BUILD COLUMN
+════════════════════════════════════════ */
+function buildColumn(title, icon, color, tasks) {
+  const col = el('div', {cls:'col-tasks', style:{borderRight:`1px solid ${COLORS.bord}`,padding:'14px 16px',minHeight:'200px'}});
+  const hdr = el('div', {style:{display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:`2px solid ${color}`,paddingBottom:'8px',marginBottom:'12px'}});
+  hdr.appendChild(el('span', {cls:'mono', style:{fontSize:'10px',fontWeight:'700',letterSpacing:'.2em',color}}, `${icon} ${title}`));
+  hdr.appendChild(el('span', {cls:'badge', style:{background:color+'22',color}}, tasks.length));
+  col.appendChild(hdr);
+
+  if (!tasks.length) {
+    const empty = el('div', {style:{display:'flex',flexDirection:'column',alignItems:'center',padding:'32px 0',opacity:'.2'}});
+    empty.appendChild(el('div', {style:{fontSize:'28px',marginBottom:'8px'}}, '◎'));
+    empty.appendChild(el('div', {cls:'mono', style:{fontSize:'9px',letterSpacing:'.12em',color:COLORS.muted}}, 'SIN TAREAS'));
+    col.appendChild(empty);
+  } else {
+    const list = el('div', {style:{display:'flex',flexDirection:'column',gap:'8px'}});
+    tasks.forEach(t => list.appendChild(buildCard(t, color)));
+    col.appendChild(list);
+  }
+  return col;
+}
+
+/* ════════════════════════════════════════
+   MIC GUIDE PANEL
+════════════════════════════════════════ */
+function buildMicGuide() {
+  const box = el('div', {cls:'mic-guide'});
+  box.appendChild(el('div', {cls:'mono', style:{fontSize:'9px',color:COLORS.amber,letterSpacing:'.15em',marginBottom:'10px'}},
+    '🔒 CÓMO HABILITAR EL MICRÓFONO'));
+  const steps = [
+    ['1','Busca el ícono 🔒 en la barra de URL del navegador'],
+    ['2','Toca → Configuración del sitio → Micrófono → Permitir'],
+    ['3','Recarga la página e intenta de nuevo'],
+    ['En iPhone:', 'Ajustes → Safari → Micrófono → Permitir'],
+  ];
+  steps.forEach(([n,t]) => {
+    const r = el('div', {cls:'mic-guide-step'});
+    r.appendChild(el('span', {cls:'mic-guide-num'}, n));
+    r.appendChild(el('span', {}, t));
+    box.appendChild(r);
+  });
+  const alt = el('div', {style:{marginTop:'10px',paddingTop:'10px',borderTop:`1px solid ${COLORS.amber}22`,fontSize:'12px',color:COLORS.muted}});
+  alt.appendChild(document.createTextNode('💡 Alternativa: usa el modo '));
+  const sw = el('button', {style:{background:'none',border:'none',color:COLORS.amber,cursor:'pointer',
+    fontSize:'12px',textDecoration:'underline',padding:'0'},
+    onclick:()=>{ S.inputType='text'; S.showMicGuide=false; render(); }}, '⌨ Texto');
+  alt.appendChild(sw); alt.appendChild(document.createTextNode(' sin micrófono'));
+  box.appendChild(alt);
+  return box;
+}
+
+/* ════════════════════════════════════════
+   MAIN RENDER
+════════════════════════════════════════ */
+function render() {
+  const app = document.getElementById('app');
+  app.innerHTML = '';
+
+  const filtered = S.tasks.filter(t =>
+    S.filter === 'pending' ? !t.done : S.filter === 'done' ? t.done : true
+  );
+  const workList = filtered.filter(t => t.category === 'trabajo');
+  const persList = filtered.filter(t => t.category === 'personal');
+  const pendTotal = S.tasks.filter(t => !t.done).length;
+  const doneTotal = S.tasks.filter(t => t.done).length;
+
+  const busy = S.voiceState !== 'idle';
+  const isRecording = S.voiceState === 'recording';
+  const stateLabel = {
+    idle:'', requesting:'Solicitando permiso…', recording:'Grabando… toca para detener',
+    transcribing:'Transcribiendo con Whisper…', parsing:'IA organizando…', saving:'Guardando…'
+  }[S.voiceState] || '';
+
+  /* ── OFFLINE ── */
+  if (!S.online) {
+    app.appendChild(el('div', {cls:'offline-banner'}, '⚠ SIN CONEXIÓN — Las nuevas tareas se sincronizarán al reconectar'));
+  }
+
+  /* ── INSTALL BANNER (Android/Desktop) ── */
+  if (S.installPrompt) {
+    const banner = el('div', {cls:'install-banner'});
+    banner.appendChild(el('span', {style:{fontSize:'13px',color:COLORS.text}},
+      '📲 Instala VozTask en tu dispositivo'));
+    const btns = el('div', {style:{display:'flex',gap:'8px'}});
+    btns.appendChild(el('button', {cls:'btn btn-amber active',
+      onclick: async () => { S.installPrompt.prompt(); const r = await S.installPrompt.userChoice; if(r.outcome==='accepted') S.installPrompt=null; render(); }
+    }, 'INSTALAR'));
+    btns.appendChild(el('button', {cls:'btn btn-dim', onclick:()=>{ S.installPrompt=null; render(); }}, 'Ahora no'));
+    banner.appendChild(btns); app.appendChild(banner);
+  }
+
+  /* ── HEADER ── */
+  const hdr = el('div', {cls:'header'});
+  const logo = el('div', {style:{display:'flex',alignItems:'center',gap:'10px'}});
+  logo.appendChild(el('div', {style:{width:'36px',height:'36px',background:COLORS.amber,borderRadius:'6px',
+    display:'flex',alignItems:'center',justifyContent:'center',fontSize:'18px',fontFamily:'monospace'}}, '◈'));
+  const logotxt = el('div');
+  logotxt.appendChild(el('div', {cls:'mono', style:{fontSize:'17px',fontWeight:'700',color:COLORS.text,letterSpacing:'.04em'}}, 'VozTask'));
+  logotxt.appendChild(el('div', {cls:'mono', style:{fontSize:'7px',letterSpacing:'.22em',color:COLORS.muted,textTransform:'uppercase'}}, 'Captura · IA · Ejecuta'));
+  logo.appendChild(logotxt); hdr.appendChild(logo);
+
+  const stats = el('div', {cls:'stats', style:{display:'flex',gap:'16px'}});
+  [{l:'Pendientes',v:pendTotal,c:COLORS.amber},{l:'Trabajo',v:S.tasks.filter(t=>t.category==='trabajo'&&!t.done).length,c:COLORS.blue},{l:'Personal',v:S.tasks.filter(t=>t.category==='personal'&&!t.done).length,c:COLORS.green},{l:'Listas',v:doneTotal,c:COLORS.muted}]
+  .forEach(s=>{ const b=el('div',{style:{textAlign:'center'}}); b.appendChild(el('span',{cls:'mono',style:{fontSize:'22px',fontWeight:'700',color:s.c,display:'block',lineHeight:'1'}},s.v)); b.appendChild(el('span',{cls:'mono',style:{fontSize:'7px',letterSpacing:'.15em',color:COLORS.muted,textTransform:'uppercase',display:'block',marginTop:'2px'}},s.l)); stats.appendChild(b); });
+  hdr.appendChild(stats); app.appendChild(hdr);
+
+  /* ── LOADING ── */
+  if (S.loading) {
+    app.appendChild(el('div', {style:{display:'flex',alignItems:'center',justifyContent:'center',height:'300px',fontFamily:'monospace',color:COLORS.amber,letterSpacing:'.15em',fontSize:'13px'}}, 'CARGANDO…'));
+    return;
+  }
+
+  /* ── INPUT ZONE ── */
+  const inpZone = el('div', {cls:'input-zone'});
+
+  // Top bar (mode + input type toggles)
+  const topBar = el('div', {style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px',flexWrap:'wrap',gap:'8px'}});
+  const mg = el('div', {style:{display:'flex',gap:'6px'}});
+  [['ia','✦ IA organiza'],['rapido','⚡ Rápido']].forEach(([v,l]) => {
+    const a = S.mode === v;
+    const b = el('button', {cls:`btn ${a?'btn-amber active':'btn-dim'}`, onclick:()=>{ S.mode=v; render(); }}, l);
+    mg.appendChild(b);
+  });
+  topBar.appendChild(mg);
+  const tg = el('div', {style:{display:'flex',gap:'6px'}});
+  [['voice','🎤 Voz'],['text','⌨ Texto']].forEach(([v,l]) => {
+    const a = S.inputType === v;
+    const b = el('button', {cls:`btn ${a?'btn-dim active':'btn-dim'}`, onclick:()=>{ S.inputType=v; S.showMicGuide=false; render(); }}, l);
+    tg.appendChild(b);
+  });
+  topBar.appendChild(tg); inpZone.appendChild(topBar);
+
+  if (S.inputType === 'voice') {
+    const vc = el('div', {style:{display:'flex',flexDirection:'column',alignItems:'center',gap:'10px'}});
+
+    // Mic button
+    const micColor = S.micPerm==='denied' ? COLORS.red : COLORS.amber;
+    const micBtn = el('button', {
+      cls:`mic-btn${isRecording?' pulse':''}`,
+      style:{
+        borderColor: isRecording ? micColor : busy ? COLORS.blue : S.micPerm==='denied' ? COLORS.red+'66' : COLORS.faint,
+        background: isRecording ? micColor : 'transparent',
+        color: isRecording ? COLORS.bg : busy ? COLORS.blue : S.micPerm==='denied' ? COLORS.red : micColor,
+        fontSize: busy&&!isRecording ? '24px' : '30px',
+        cursor: busy&&!isRecording ? 'default' : 'pointer',
+      },
+      onclick: isRecording ? stopVoice : startVoice,
+    }, isRecording ? '■' : busy ? '↻' : S.micPerm==='denied' ? '🔒' : '🎤');
+
+    if (busy && !isRecording) micBtn.classList.add('spin');
+    vc.appendChild(micBtn);
+    vc.appendChild(el('div', {cls:'mono', style:{fontSize:'9px',color:isRecording?micColor:S.micPerm==='denied'?COLORS.red:COLORS.muted,letterSpacing:'.12em',textAlign:'center'}},
+      isRecording ? 'TOCA PARA DETENER' : stateLabel.toUpperCase() || (S.micPerm==='denied'?'PERMISO REQUERIDO':'TOCA PARA HABLAR')));
+
+    if (S.transcript) {
+      const tb = el('div', {style:{background:COLORS.surf,border:`1px solid ${COLORS.bord}`,borderRadius:'6px',padding:'8px 16px',maxWidth:'480px',width:'100%',textAlign:'center'}});
+      tb.appendChild(el('div', {cls:'mono', style:{fontSize:'8px',color:COLORS.amber,letterSpacing:'.2em',marginBottom:'4px'}}, 'ESCUCHADO'));
+      tb.appendChild(el('div', {style:{fontSize:'13px',color:COLORS.text,fontStyle:'italic'}}, `"${S.transcript}"`));
+      vc.appendChild(tb);
+    }
+
+    inpZone.appendChild(vc);
+    if (S.showMicGuide || S.micPerm === 'denied') inpZone.appendChild(buildMicGuide());
+
+  } else {
+    // Text mode
+    const wrap = el('div', {style:{maxWidth:'580px',margin:'0 auto'}});
+    const r1 = el('div', {style:{display:'flex',gap:'8px',marginBottom:'8px'}});
+    const ti = el('input', {type:'text', cls:'vt-input', placeholder:'Escribe tu tarea o nota…',
+      value:S.manualText, oninput:e=>{S.manualText=e.target.value;},
+      onkeydown:e=>{if(e.key==='Enter')submitManual();}});
+    if (busy) ti.setAttribute('disabled','');
+    r1.appendChild(ti);
+    r1.appendChild(el('button', {cls:'btn btn-amber active', style:{padding:'10px 18px',fontSize:'10px'},
+      onclick:submitManual}, busy?'…':'AÑADIR'));
+    wrap.appendChild(r1);
+
+    const r2 = el('div', {style:{display:'flex',gap:'8px',flexWrap:'wrap'}});
+    const dlWrap = el('div', {style:{display:'flex',alignItems:'center',gap:'8px',background:COLORS.surf,border:`1px solid ${COLORS.bord}`,borderRadius:'6px',padding:'0 12px',flex:'1',minWidth:'150px'}});
+    dlWrap.appendChild(el('span', {cls:'mono', style:{fontSize:'8px',color:'#60A5FA',whiteSpace:'nowrap'}}, '📅 Límite'));
+    dlWrap.appendChild(el('input', {type:'date', value:S.manualDeadline,
+      style:{background:'transparent',border:'none',color:COLORS.text,outline:'none',cursor:'pointer',colorScheme:'dark',padding:'10px 0',flex:'1'},
+      onchange:e=>{S.manualDeadline=e.target.value;}}));
+    r2.appendChild(dlWrap);
+
+    const recSel = el('select', {cls:'vt-select', style:{flex:'1',minWidth:'140px'},
+      onchange:e=>{S.manualRec=e.target.value;}});
+    [['','Sin recurrencia'],['diaria','↻ Diaria'],['semanal','↻ Semanal'],['mensual','↻ Mensual']].forEach(([v,l])=>{
+      const o = el('option',{value:v},l); if(v===S.manualRec)o.selected=true; recSel.appendChild(o);
+    });
+    r2.appendChild(recSel);
+    wrap.appendChild(r2); inpZone.appendChild(wrap);
+  }
+
+  app.appendChild(inpZone);
+
+  /* ── FILTER BAR ── */
+  const fb = el('div', {cls:'filter-bar'});
+  const fg1 = el('div', {style:{display:'flex',gap:'4px',flexWrap:'wrap'}});
+  [['pending','Pendientes'],['all','Todas'],['done','Completadas']].forEach(([v,l])=>{
+    fg1.appendChild(el('button',{cls:`btn ${S.filter===v?'btn-amber active':'btn-dim'}`,onclick:()=>{S.filter=v;render();}},l));
+  });
+  [['both','Ambas'],['trabajo','🏭'],['personal','🏠']].forEach(([v,l])=>{
+    fg1.appendChild(el('button',{cls:`btn ${S.view===v?'btn-dim active':'btn-dim'}`,onclick:()=>{S.view=v;render();}},l));
+  });
+  fb.appendChild(fg1);
+
+  const fg2 = el('div', {style:{display:'flex',gap:'4px',flexWrap:'wrap'}});
+  if (!S.selectMode) {
+    if (doneTotal > 0) fg2.appendChild(el('button',{cls:'btn btn-red',onclick:()=>{S.confirmAction='completadas';render();}},`🗑 Completadas (${doneTotal})`));
+    if (S.online && S.offlineQueue.length > 0) fg2.appendChild(el('button',{cls:'btn',style:{borderColor:COLORS.amber,color:COLORS.amber},onclick:async()=>{await processQueue();await loadTasks();}},`↑ Sincronizar (${S.offlineQueue.length})`));
+    fg2.appendChild(el('button',{cls:'btn btn-dim',onclick:startSelectMode},'☐ Seleccionar'));
+  } else {
+    if (S.selectedIds.length > 0) fg2.appendChild(el('button',{cls:'btn btn-red',onclick:()=>{S.confirmAction='seleccionadas';render();}},`🗑 Eliminar (${S.selectedIds.length})`));
+    fg2.appendChild(el('button',{cls:'btn btn-dim',onclick:endSelectMode},'✕ Cancelar'));
+  }
+  fb.appendChild(fg2); app.appendChild(fb);
+
+  /* ── CONFIRM STRIP ── */
+  if (S.confirmAction) {
+    const n = S.confirmAction==='completadas' ? doneTotal : S.selectedIds.length;
+    const label = S.confirmAction==='completadas' ? `${n} tareas completadas` : `${n} tareas seleccionadas`;
+    const strip = el('div', {cls:'confirm-strip'});
+    strip.appendChild(el('span',{cls:'mono',style:{fontSize:'10px',color:COLORS.red}},`⚠ ¿Eliminar ${label}? No se puede deshacer.`));
+    const bb = el('div',{style:{display:'flex',gap:'8px'}});
+    bb.appendChild(el('button',{cls:'btn btn-dim',onclick:()=>{S.confirmAction=null;render();}},'CANCELAR'));
+    bb.appendChild(el('button',{cls:'btn btn-red',style:{background:COLORS.red,color:'#fff',border:'none'},onclick:confirmDelete},'SÍ, ELIMINAR'));
+    strip.appendChild(bb); app.appendChild(strip);
+  }
+
+  /* ── COLUMNS ── */
+  const cols = el('div', {cls:`columns${S.view!=='both'?' single':''}`});
+  const showWork = S.view==='both' || S.view==='trabajo';
+  const showPers = S.view==='both' || S.view==='personal';
+  const colWork = showWork ? (S.view==='both' ? workList : filtered.filter(t=>t.category==='trabajo')) : [];
+  const colPers = showPers ? (S.view==='both' ? persList : filtered.filter(t=>t.category==='personal')) : [];
+  if (showWork) cols.appendChild(buildColumn('TRABAJO','🏭',COLORS.blue,colWork));
+  if (showPers) cols.appendChild(buildColumn('PERSONAL','🏠',COLORS.green,colPers));
+  app.appendChild(cols);
+}
+
+/* ════════════════════════════════════════
+   PWA — Service Worker + Install Prompt
+════════════════════════════════════════ */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(e => console.warn('SW:', e));
+}
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  S.installPrompt = e;
+  render();
+});
+
+window.addEventListener('online',  async () => { S.online=true; await processQueue(); await loadTasks(); });
+window.addEventListener('offline', () => { S.online=false; toast('Sin conexión — modo offline', COLORS.amber, 0); render(); });
+
+/* ════════════════════════════════════════
+   INIT
+════════════════════════════════════════ */
+loadTasks();
+</script>
+</body>
+</html>

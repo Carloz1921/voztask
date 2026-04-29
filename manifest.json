@@ -1,0 +1,26 @@
+{
+  "name": "VozTask — Captura por Voz",
+  "short_name": "VozTask",
+  "description": "Gestiona tareas con voz e IA. Trabajo y Personal.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#080c12",
+  "theme_color": "#E8A020",
+  "lang": "es-PE",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
