@@ -195,6 +195,16 @@ function stopVoice(){if(recog&&S.voiceState==='listening')recog.stop();}
 /* ══ GEMINI AI ══ */
 async function processText(text,forcedDL=null,forcedRec=null){
   const{str:today,day}=todayCtx();let parsed=null;
+  /* ── Clasificador local de respaldo (cuando Gemini falla o no está configurado) ── */
+  function localClassify(text){
+    const t=text.toLowerCase();
+    const personalWords=['hijo','hija','esposa','esposo','pareja','mamá','mama','papá','papa','hermano','hermana','familiar','bebé','bebe','niño','niña','sobrino','médico','medico','doctor','doctora','clínica','clinica','hospital','posta','farmacia','botica','cita médica','cita medica','pediatra','dentista','oftalmólogo','oftalmologo','análisis de sangre','analisis de sangre','vacuna','medicina','pastilla','receta','salud','enfermedad','llevar al','mercado','supermercado','compras del hogar','pagar luz','pagar agua','pagar internet','alquiler','casa','gym','deporte','cumpleaños','aniversario','reunión familiar','reunion familiar','viaje personal','vacaciones','cine','restaurante','universidad de lima','postgrado','maestría','maestria','grupo 2','uli_bot','tarea del colegio','colegio del hijo','reunión de padres','reunion de padres','matrícula','matricula','útiles','útiles escolares','banco personal','tarjeta personal','préstamo personal','prestamo personal','afp','soat','reniec','pasaporte','notaría','notaria'];
+    const trabajoWords=['refinería','refineria','la pampilla','repsol','laboratorio','fisicoquímica','fisicoquimica','muestra','ensayo','LabWare','lims','sap','calibración','calibracion','trazabilidad','iso 9001','iso 17025','osinergmin','sunat','produce','ron','mon','octanaje','viscosidad','densidad','azufre','gasolina','diesel','diésel','turbo','rvb','glp','nafta','gasohol','hidrocarburo','cfr','waukesha','xcp','adt282','am1730','cromatógrafo','cromatografo','viscosímetro','viscosimetro','balanza','informe técnico','informe tecnico','reporte de turno','reporte de producción','reporte de produccion','no conformidad','acción correctiva','accion correctiva','auditoría','auditoria','acreditación','acreditacion','inacal','power bi','power automate','sharepoint','presupuesto del área','presupuesto del area','kpi','turno','guardia','shift','bitácora','bitacora','proveedor corporativo','contratista'];
+    for(const w of personalWords){if(t.includes(w))return'personal';}
+    for(const w of trabajoWords){if(t.includes(w))return'trabajo';}
+    return'personal'; // duda → personal (más seguro que trabajo)
+  }
+
   if(S.mode==='ia'){
     try{
       const prompt=`Hoy es ${today} (${day}). Eres el asistente personal de Carlos Rojas Chávez, Jefe de Laboratorio Fisicoquímica de Refinería La Pampilla (Repsol), Lima, Perú. También estudia un postgrado en IA en la Universidad de Lima.
@@ -279,7 +289,12 @@ PRIORIDAD — guíate así:
 · baja: cuando pueda, referencia, sin fecha, idea, nota informativa
 
 Texto a analizar: "${text}"`;
-      const gr=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${CONFIG.GEMINI_KEY}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.1,maxOutputTokens:400}})});
+      let gr, retries=0;
+      while(retries<=2){
+        gr=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${CONFIG.GEMINI_KEY}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.1,maxOutputTokens:400}})});
+        if(gr.status===429&&retries<2){retries++;toast(`⏳ Límite API, reintentando (${retries}/2)…`,C.amber,0);await new Promise(r=>setTimeout(r,4000*retries));continue;}
+        break;
+      }
       if(!gr.ok)throw new Error('Gemini '+gr.status);
       const gd=await gr.json();
       const raw=gd.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
@@ -287,8 +302,9 @@ Texto a analizar: "${text}"`;
       parsed=JSON.parse(m?m[0]:'{}');
     }catch(e){console.warn('Gemini:',e);parsed=null;}
   }
+  const fallbackCategory=localClassify(text);
   const now=new Date().toISOString();
-  const task={id:uid(),title:parsed?.title||text.slice(0,75),detail:(parsed?.detail&&parsed.detail!=='null')?parsed.detail:null,category:parsed?.category||'trabajo',type:parsed?.type||'tarea',priority:parsed?.priority||'media',deadline:forcedDL||(parsed?.deadline&&parsed.deadline!=='null'?parsed.deadline:null),recurrence:forcedRec||(parsed?.recurrence&&parsed.recurrence!=='null'?parsed.recurrence:null),done:false,createdAt:now,updatedAt:now};
+  const task={id:uid(),title:parsed?.title||text.slice(0,75),detail:(parsed?.detail&&parsed.detail!=='null')?parsed.detail:null,category:parsed?.category||fallbackCategory,type:parsed?.type||'tarea',priority:parsed?.priority||'media',deadline:forcedDL||(parsed?.deadline&&parsed.deadline!=='null'?parsed.deadline:null),recurrence:forcedRec||(parsed?.recurrence&&parsed.recurrence!=='null'?parsed.recurrence:null),done:false,createdAt:now,updatedAt:now};
   S.tasks=[task,...S.tasks];localStorage.setItem('vt-cache',JSON.stringify(S.tasks));
   S.voiceState='idle';S.transcript='';S.manualText='';S.manualDeadline='';S.manualRec='';
   render();await dbAdd(task);
